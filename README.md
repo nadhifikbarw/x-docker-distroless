@@ -1,6 +1,6 @@
 # Using distroless image for release image
 
-WIP. Personal notes about distroless image for containerized software release (not not specific to [Google's `distroless` images](https://github.com/GoogleContainerTools/distroless)).
+Personal notes about distroless image for containerized software release (not specific to [Google's `distroless` images](https://github.com/GoogleContainerTools/distroless)).
 
 ## [What’s a distroless image?](https://www.docker.com/blog/is-your-container-image-really-distroless/)
 
@@ -25,40 +25,42 @@ Fewer components = fewer possible exploits entrypoints, and smaller release imag
 
 ## Usage
 
-This type of images can be suitable when your release requirements might only involves statically-linked binaries, workflows that are very familiar when using compiled-language.
+This type of images can be suitable when your release requirements might only involves statically-linked binaries, workflows that are very familiar if you're using compiled-language.
 
-For example, you have Go web services that are expected to run behind reverse proxy / load balance that  handle TLS termination can use `gcr.io/distroless/base-nossl-debian12`
+For example, you have Go web services that are expected to run behind reverse proxy / load balancer that handle TLS termination for you, hence you can use `gcr.io/distroless/base-nossl-debian12`
 
 ## `Dockerfile` & Multi-stage build
 
-Using multi-stage is a given "requirement" to author `Dockerfile` using distroless image conveniently.
+Using multi-stage is a given "requirement" to author `Dockerfile` to build distroless image conveniently. Typically:
 
 * You dedicate a build stage, typically named `build` using language-specific image to perform your builds.
 * Pick suitable distroless image for your application stack, and copy over application artifacts from `build` stage.
 
-
 ### Scenario
-* Go app without CGO deps
+* Node.js app bundled using [`pnpm deploy`](https://pnpm.io/cli/deploy),
+* [`nitro.build` web servers targeting nodejs runtime](https://nitro.build/deploy/runtimes/node)
+* Statically-linked Go app
 
 ```Dockerfile
+# Build stage
 FROM golang:1.22 as build
 
 WORKDIR /go/src/app
 COPY . .
 
+# Do build related commands
 RUN go mod download
 RUN go vet -v
 RUN go test -v
 
+# Produce statically-linked binary
 RUN CGO_ENABLED=0 go build -o /go/bin/app
 
+# Pack it up using distroless image
 FROM gcr.io/distroless/static-debian12
-
+# Copy application artifacts from `build` stage
 COPY --from=build /go/bin/app /
 CMD ["/app"]
 ```
-
-* Node.js app bundled using [`pnpm deploy`](https://pnpm.io/cli/deploy),
-* [`nitro.build` web servers targeting nodejs runtime](https://nitro.build/deploy/runtimes/node)
 
 [Multi-stage builds reference.](https://docs.docker.com/build/building/multi-stage/)
